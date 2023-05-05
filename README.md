@@ -25,7 +25,7 @@ Provides instrumentation of both the client and server sides of Apache Thrift.  
 
 Since there is existing instrumentation for Thrift in the New Relic Java Agent it is recommended that you disable that instrumentation to avoid conflicts between it and this instrumentation.  Instructions for disabling are below.
 
-This use this instrumentation.   
+To use this instrumentation.   
 1. Download the latest release.    
 2. In the New Relic Java Agent directory (directory containing newrelic.jar), create a directory named extensions if it doe not already exist.   
 3. Copy the jars into the extensions directory.   
@@ -36,22 +36,22 @@ This use this instrumentation.
 To avoid conflicts disable the Java Agent instrumentation as follows:
 
 1. Edit newrelic.yml and find the following:    
-
- class_transformer:
-    # This instrumentation reports the name of the user principal returned from 
-    # HttpServletRequest.getUserPrincipal() when servlets and filters are invoked.
-    com.newrelic.instrumentation.servlet-user:
-      enabled: false
-
-    com.newrelic.instrumentation.spring-aop-2:
-      enabled: false
-
+   
+&nbsp;&nbsp;class_transformer:   
+&nbsp;&nbsp;&nbsp;&nbsp;# This instrumentation reports the name of the user principal returned from    
+&nbsp;&nbsp;&nbsp;&nbsp;# HttpServletRequest.getUserPrincipal() when servlets and filters are invoked.   
+&nbsp;&nbsp;&nbsp;&nbsp;com.newrelic.instrumentation.servlet-user:   
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled: false.  
+   
+&nbsp;&nbsp;&nbsp;&nbsp;com.newrelic.instrumentation.spring-aop-2:   
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled: false.  
+   
  2. Add the following lines, be sure to have 4 spaces at the beginning of the first line and 6 spaces at the beginning of the second line.
 
-     com.newrelic.instrumentation.thrift-0.8:
-      enabled: false
- 3. Save newrelic.yml
-
+&nbsp;&nbsp;&nbsp;&nbsp;com.newrelic.instrumentation.thrift-0.8:   
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;enabled: false.   
+ 3. Save newrelic.yml.  
+    
 ## Getting Started
 
 After deployment, you should be able to client calls showing up as external services on the Thrift Client application and Thrift transactions on the Thrift server.  Additionally in the dirstributed tracing view in the New Relic UI, you should see the two transaction tied together.  Note that on the client side the external calls will only show up if there is an active transaction.    
