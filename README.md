@@ -19,7 +19,8 @@
 
 # New Relic Java Instrumentation for Apache Thrift
 
-Provides instrumentation of both the client and server sides of Apache Thrift.  This includes support for distributed tracing between the client and the server.
+Provides instrumentation of both the client and server sides of Apache Thrift.  This includes support for distributed tracing between the client and the server.    
+This instrumentation support Apache Thrift versions 0.10.0 and above.    
 
 ## Installation
 
