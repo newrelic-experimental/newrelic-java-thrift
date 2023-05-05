@@ -1,1 +1,6 @@
 rootProject.name = 'java-instrumentation-template'
+include 'thriftclient-0.10'
+include 'thriftserver-0.9.2'
+include 'thriftserver-0.10'
+include 'thriftserver-0.13'
+include 'thriftserver-0.17'
