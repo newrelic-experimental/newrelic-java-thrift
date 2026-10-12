@@ -6,3 +6,5 @@
 .project
 build
 bin
+.gradle
+CLAUDE.md

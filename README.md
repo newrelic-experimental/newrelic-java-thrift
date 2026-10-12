@@ -32,6 +32,37 @@ To use this instrumentation.
 3. Copy the jars into the extensions directory.   
 4. Restart the application.   
 
+### Alternative: pull the jar from Maven Central with Gradle
+
+`thriftserver-0.17` is also published to Maven Central under the `com.newrelic.labs` groupId, so you can resolve it
+as a normal dependency and copy it into the agent's `extensions` directory as part of your build, instead of
+downloading the release jar by hand:
+
+```groovy
+configurations {
+    newRelicExtension
+}
+
+dependencies {
+    newRelicExtension 'com.newrelic.labs:thriftserver-0.17:1.0.0'
+}
+
+task copyNewRelicExtension(type: Copy) {
+    from configurations.newRelicExtension
+    into "${newRelicAgentHome}/extensions" // directory containing newrelic.jar
+}
+```
+
+> **Note for internal New Relic services:** if your service's build already applies New Relic's internal
+> `newrelic-java-service` Gradle plugin, it provides its own `agentExtension` configuration for exactly this
+> purpose — add the dependency directly instead of the `Copy`-task approach above:
+> ```kotlin
+> dependencies {
+>     val agentExtension = project.configurations.getByName("agentExtension")
+>     agentExtension("com.newrelic.labs:thriftserver-0.17:1.0.0")
+> }
+> ```
+
 ## Disabling New Relic Java Agent instrumentation
 
 To avoid conflicts disable the Java Agent instrumentation as follows:
