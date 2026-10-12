@@ -44,7 +44,7 @@ configurations {
 }
 
 dependencies {
-    newRelicExtension 'com.newrelic.labs:thriftserver-0.17:1.0.0'
+    newRelicExtension 'com.newrelic.labs:thriftserver-0.17:1.0.3'
 }
 
 task copyNewRelicExtension(type: Copy) {
@@ -59,7 +59,7 @@ task copyNewRelicExtension(type: Copy) {
 > ```kotlin
 > dependencies {
 >     val agentExtension = project.configurations.getByName("agentExtension")
->     agentExtension("com.newrelic.labs:thriftserver-0.17:1.0.0")
+>     agentExtension("com.newrelic.labs:thriftserver-0.17:1.0.3")
 > }
 > ```
 
