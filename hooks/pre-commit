@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# Pre-commit hook — blocks sensitive data, binary assets, and build artifacts
+# Sections:
+#   1. Blocked file types  — images, build output, logs, .env, real config files
+#   2. Content scans       — passwords, usernames, tokens, hostnames, IPs, keys, JWTs,
+#                             DB URLs, and NR account IDs
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+FOUND=0
+REPORT=()
+
+STAGED_FILES=$(git diff --cached --name-only)
+
+flag_file() {
+    local label="$1"
+    local file="$2"
+    REPORT+=("  ${RED}[$label]${NC} $file")
+    FOUND=1
+}
+
+flag_content() {
+    local label="$1"
+    local line="$2"
+    REPORT+=("  ${RED}[$label]${NC} $line")
+    FOUND=1
+}
+
+# ── Section 1: Blocked file types ─────────────────────────────────────────────
+
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+
+    # Exceptions: files that must stay committed for a fresh clone to build with
+    # zero extra commands (gradle wrapper jar, template-lib / test-lib jars).
+    if echo "$f" | grep -qE '^gradle/wrapper/gradle-wrapper\.jar$|^template-lib/.*\.jar$|^test-lib/.*\.jar$'; then
+        continue
+    fi
+
+    # Images and screenshots
+    if echo "$f" | grep -qiE '\.(png|jpg|jpeg|gif|bmp|tiff|ico|webp|svg)$'; then
+        flag_file "IMAGE/SCREENSHOT" "$f"
+    fi
+
+    # Compiled / packaged build output
+    if echo "$f" | grep -qiE '^build/|/build/|^target/|\.jar$|\.class$|\.war$|\.ear$|\.zip$'; then
+        flag_file "BUILD ARTIFACT" "$f"
+    fi
+
+    # Gradle/Maven cache and wrapper jars
+    if echo "$f" | grep -qiE '^\.gradle/|/\.gradle/|gradle/wrapper/gradle-wrapper\.jar$'; then
+        flag_file "BUILD CACHE" "$f"
+    fi
+
+    # Log files
+    if echo "$f" | grep -qiE '\.log$|^logs/|/logs/'; then
+        flag_file "LOG FILE" "$f"
+    fi
+
+    # .env files (environment variable files with real values)
+    if echo "$f" | grep -qiE '(^|/)\.env(\.|$)|(^|/)\.envrc$'; then
+        flag_file "ENV FILE" "$f"
+    fi
+
+    # Real config files — only templates should be committed
+    if echo "$f" | grep -qiE '(^|/)newrelic\.yml$|(^|/)application\.(properties|yml|yaml)$'; then
+        flag_file "CONFIG FILE" "$f  ← commit a .template/.example version only, never the real config"
+    fi
+
+done <<< "$STAGED_FILES"
+
+# ── Section 2: Content scans ──────────────────────────────────────────────────
+
+DIFF=$(git diff --cached | grep "^+" | grep -v "^+++")
+
+# Safe patterns — these are never flagged even if they match a scan pattern
+SAFE='(YOUR_[A-Z_]+|<[-A-Za-z0-9_ ]+>|PLACEHOLDER|localhost|127\.0\.0\.1|0\.0\.0\.0|example\.(com|org|net)|newrelic\.com|nr-data\.net|maven\.org|gradle\.org|plugins\.gradle\.org|github\.com|githubusercontent\.com|apache\.org|thrift\.apache\.org|w3\.org|opensource\.newrelic\.com|shields\.io|sonatype\.(com|org)|\[a-zA-Z\]|=\s*"?\$\{|=\s*"?\$\()'
+
+scan() {
+    local label="$1"
+    local pattern="$2"
+    local matches
+    matches=$(echo "$DIFF" | grep -iE -- "$pattern" | grep -viE -- "$SAFE")
+    while IFS= read -r line; do
+        [ -n "$line" ] && flag_content "$label" "$line"
+    done <<< "$matches"
+}
+
+# Passwords / usernames — non-empty assignment (properties, env vars, shell scripts)
+scan "PASSWORD" \
+    '(^|[^a-zA-Z])(password|passwd)\s*[=:]\s*\S{4,}'
+
+scan "USERNAME" \
+    '(^|[^a-zA-Z])(username)\s*[=:]\s*[A-Za-z0-9_@.]{3,}'
+
+# Tokens and API keys — including New Relic license/API/insert keys and Sonatype/signing creds
+scan "TOKEN/API KEY" \
+    '(token|api_key|apikey|insertKey|insert_key|secret_key|access_key|license_key|licensekey|NR_INSERT_KEY|NR_LICENSE_KEY|NR_API_KEY|auth_key|bearer|signingkey|signingpassword|sonatype_)\s*[=:]\s*["\x27]?[A-Za-z0-9._\-]{10,}'
+
+scan "NR LICENSE/API KEY FORMAT" \
+    '\b(NRAK|NRAA|NRJS)-[A-Za-z0-9]{10,}\b'
+
+# Hostname/domain — generic host/url/endpoint keys
+scan "HOSTNAME/DOMAIN" \
+    '([^a-zA-Z]host|baseUrl|base_url|endpoint|serverUrl|server)\s*[=:]\s*["\x27]?[a-zA-Z0-9][a-zA-Z0-9\-]{2,}\.[a-zA-Z0-9\-]{2,}\.[a-zA-Z]{2,}'
+
+# Hardcoded HTTP/HTTPS URLs — catches hostnames embedded in code, scripts, or config
+scan "HARDCODED URL" \
+    'https?://[a-zA-Z0-9][a-zA-Z0-9\-]{2,}\.[a-zA-Z0-9\-]{2,}\.[a-zA-Z]{2,}'
+
+# Private IP addresses
+scan "PRIVATE IP" \
+    '\b(10\.[0-9]{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])|192\.168)\.[0-9]{1,3}\.[0-9]{1,3}\b'
+
+# Generic secrets
+scan "SECRET" \
+    '(client_secret|private_key|aws_secret|azure_key|gcp_key|db_password|database_password|aes_key)\s*[=:]\s*\S{8,}'
+
+# SSH/PGP private key headers
+scan "PRIVATE KEY BLOCK" \
+    '-----BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----'
+
+# JWT tokens — three base64url segments
+scan "JWT TOKEN" \
+    'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'
+
+# Database / broker connection strings
+scan "CONNECTION STRING" \
+    '(jdbc:[a-zA-Z]+://|mongodb(\+srv)?://|postgresql://|mysql://|redis://|sqlserver://|tcp://)[^ "]{8,}'
+
+# New Relic account IDs — JSON format and env var format
+scan "NR ACCOUNT ID" \
+    '("accountId[s]?":\s*\[?[1-9][0-9]{4,}\]?|NR_ACCOUNT_ID\s*[=:]\s*[1-9][0-9]{4,}|newrelic\.accountId\s*=\s*[1-9][0-9]{4,})'
+
+# ── Report ────────────────────────────────────────────────────────────────────
+
+if [ $FOUND -eq 1 ]; then
+    echo ""
+    echo -e "${RED}╔════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║   PRE-COMMIT CHECK FAILED                          ║${NC}"
+    echo -e "${RED}║   Sensitive data or blocked files detected         ║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    for item in "${REPORT[@]}"; do
+        echo -e "$item"
+    done
+    echo ""
+    echo -e "${YELLOW}Rules:${NC}"
+    echo -e "  Credentials   → use placeholders: YOUR_USERNAME / YOUR_PASSWORD / YOUR_TOKEN"
+    echo -e "  Hostnames     → use placeholders: YOUR_HOST"
+    echo -e "  Images/PNGs   → do not commit screenshots or binary assets"
+    echo -e "  Build output  → add build/ and *.jar entries to .gitignore"
+    echo -e "  Config files  → commit a .template/.example version only, never the real file"
+    echo -e "  .env files    → never commit — use environment variables at runtime"
+    echo ""
+    exit 1
+fi
+
+echo -e "${GREEN}✓ Pre-commit scan passed — no sensitive data or blocked files detected${NC}"
+exit 0
